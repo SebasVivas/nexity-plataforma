@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexity — Benká Group</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; font-family: 'Inter', sans-serif; }
+    body { background: #F3F4F6; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+    * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+  </style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="20" fill="#0F7FFF"/>
+    <text x="50" y="68" font-family="Inter, sans-serif" font-size="56" font-weight="800" fill="#fff" text-anchor="middle">N</text>
+  </svg>
+</template>
+<div id="root"></div>
+
+<script type="text/babel" src="nexity/icons.jsx"></script>
+<script type="text/babel" src="nexity/ui.jsx"></script>
+<script type="text/babel" src="nexity/layout.jsx"></script>
+<script type="text/babel" src="nexity/auth.jsx"></script>
+<script type="text/babel" src="nexity/dashboard.jsx"></script>
+<script type="text/babel" src="nexity/reports.jsx"></script>
+<script type="text/babel" src="nexity/alerts.jsx"></script>
+<script type="text/babel" src="nexity/users.jsx"></script>
+<script type="text/babel" src="nexity/logs.jsx"></script>
+<script type="text/babel" src="nexity/settings-nexity.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primaryColor": "#0F7FFF",
+  "darkMode": false,
+  "dashboardMode": "empty",
+  "usersMode": "filled",
+  "alertsMode": "filled",
+  "logsMode": "filled"
+}/*EDITMODE-END*/;
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+const App = () => {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [dark, setDark] = React.useState(tweaks.darkMode);
+  // ?pantalla=home opens the app already signed in (demos and screenshots)
+  const [authed, setAuthed] = React.useState(() => new URLSearchParams(window.location.search).get('pantalla') === 'home');
+  const [user, setUser] = React.useState(DEFAULT_USER); // profile returned by the simulated login
+  const [loading, setLoading] = React.useState(false);
+  const [loadProgress, setLoadProgress] = React.useState(0);
+  const [section, setSection] = React.useState('dashboard');
+  const [reportView, setReportView] = React.useState(null); // null | 'list' | 'detail' | 'new'
+  const [openReport, setOpenReport] = React.useState(null);
+  const [lang, setLang] = React.useState(getAuthLang);
+  const loadingPreview = React.useMemo(() => new URLSearchParams(window.location.search).get('pantalla') === 'carga', []);
+
+  const changeLang = (value) => { setLang(value); saveAuthLang(value); };
+
+  // Simulate loading after login
+  const handleLogin = (profile) => {
+    if (profile) setUser(profile);
+    setLoading(true);
+    let p = 0;
+    const iv = setInterval(() => {
+      p += Math.random() * 25;
+      if (p >= 100) { p = 100; clearInterval(iv); setTimeout(() => { setLoading(false); setAuthed(true); }, 300); }
+      setLoadProgress(Math.min(Math.round(p), 100));
+    }, 280);
+  };
+
+  const navigateTo = (sec) => {
+    if (!navItemsFor(user.role).some(i => i.id === sec)) sec = 'dashboard';
+    setSection(sec);
+    if (sec === 'reports') setReportView('list');
+    else setReportView(null);
+    setOpenReport(null);
+  };
+
+  const langTweak = (
+    <TweaksPanel>
+      <TweakSection label="Login" />
+      <TweakRadio label="Language" value={lang} options={[{label:'English',value:'en'},{label:'Español',value:'es'}]} onChange={changeLang} />
+    </TweaksPanel>
+  );
+
+  if (loadingPreview) return <LoadingScreen progress={40} lang={lang} />;
+  if (loading) return <LoadingScreen progress={loadProgress} lang={lang} />;
+  if (!authed) return <><AuthScreen onLogin={handleLogin} lang={lang} />{langTweak}</>;
+
+  const renderContent = () => {
+    if (section === 'reports') {
+      if (reportView === 'new')    return <NewReport onBack={() => setReportView('list')} />;
+      if (reportView === 'detail') return <ReportDetail report={openReport} onBack={() => setReportView('list')} />;
+      return <ReportsList onOpen={(r) => { setOpenReport(r); setReportView('detail'); }} onNew={() => setReportView('new')} />;
+    }
+    if (section === 'alerts')   return tweaks.alertsMode === 'empty' ? <AlertsEmpty onCreateAlert={() => {}} /> : <AlertsFilled empty={tweaks.alertsMode === 'no-alerts'} />;
+    if (section === 'users')    return tweaks.usersMode === 'empty' ? <UsersEmpty onAdd={() => {}} /> : <UsersFilled />;
+    if (section === 'logs')     return tweaks.logsMode === 'empty' ? <LogsEmpty /> : <LogsFilled />;
+    if (section === 'settings') return <NxSettingsPage />;
+    // dashboard
+    return tweaks.dashboardMode === 'empty' ? <DashboardEmpty onNavigate={navigateTo} lang={lang} /> : <DashboardData onNavigate={navigateTo} />;
+  };
+
+  // A first-time user has nothing pending yet; the counters belong to the "with data" state
+  const firstTime = tweaks.dashboardMode === 'empty';
+  const badges = firstTime ? {} : { alerts: '12', logs: '23' };
+  const notifications = firstTime ? [] : [
+    { text: 'Revenue target below threshold', time: '2 min ago' },
+    { text: 'Monthly report generated', time: '1h ago' },
+    { text: 'New user registered', time: '3h ago' },
+  ];
+  window.nxLogout = () => { setAuthed(false); setSection('dashboard'); setUser(DEFAULT_USER); };
+
+  return (
+    <ThemeProvider dark={dark} primary={tweaks.primaryColor}>
+      <div style={{ fontFamily:"'Inter', sans-serif" }}>
+        <DashboardLayout active={section} onNavigate={navigateTo} dark={dark} onToggleDark={() => setDark(v => !v)} badges={badges} notifications={notifications} lang={lang} user={user}>
+          {renderContent()}
+        </DashboardLayout>
+
+        <TweaksPanel>
+          <TweakColor id="primaryColor" label="Brand Color" />
+          <TweakToggle id="darkMode" label="Dark Mode" />
+          <TweakRadio label="Language" value={lang} options={[{label:'English',value:'en'},{label:'Español',value:'es'}]} onChange={changeLang} />
+          <TweakSection label="Dashboard" />
+          <TweakRadio id="dashboardMode" label="Dashboard state" options={[{label:'With data',value:'data'},{label:'Empty (first time)',value:'empty'}]} />
+          <TweakSection label="Sections" />
+          <TweakRadio id="alertsMode" label="Alerts" options={[{label:'With data',value:'filled'},{label:'No alerts',value:'no-alerts'},{label:'Empty',value:'empty'}]} />
+          <TweakRadio id="usersMode" label="Users" options={[{label:'With data',value:'filled'},{label:'Empty',value:'empty'}]} />
+          <TweakRadio id="logsMode" label="Logs" options={[{label:'With data',value:'filled'},{label:'Empty',value:'empty'}]} />
+        </TweaksPanel>
+      </div>
+    </ThemeProvider>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
